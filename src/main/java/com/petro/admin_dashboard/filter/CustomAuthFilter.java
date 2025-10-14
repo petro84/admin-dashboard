@@ -17,6 +17,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
+import static com.petro.admin_dashboard.utils.ExceptionUtils.processError;
 import static java.util.Arrays.asList;
 import static java.util.Map.of;
 import static java.util.Optional.ofNullable;
@@ -58,7 +59,7 @@ public class CustomAuthFilter extends OncePerRequestFilter {
             filterChain.doFilter(request, response);
         } catch (Exception ex) {
             log.error(ex.getMessage());
-//            processError(request, response, ex);
+            processError(request, response, ex);
         }
     }
 

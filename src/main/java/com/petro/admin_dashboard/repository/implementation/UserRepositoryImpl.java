@@ -28,7 +28,6 @@ import java.util.Collection;
 import java.util.Date;
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.ExecutionException;
 
 import static com.petro.admin_dashboard.enumeration.RoleType.ROLE_USER;
 import static com.petro.admin_dashboard.enumeration.VerificationType.ACCOUNT;

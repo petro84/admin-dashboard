@@ -8,6 +8,7 @@ import com.petro.admin_dashboard.model.dto.UserDTO;
 import com.petro.admin_dashboard.provider.TokenProvider;
 import com.petro.admin_dashboard.service.RoleService;
 import com.petro.admin_dashboard.service.UserService;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -22,8 +23,8 @@ import java.net.URI;
 import static com.petro.admin_dashboard.mapper.UserDTOMapper.toUser;
 import static java.time.LocalDateTime.now;
 import static java.util.Map.of;
-import static org.springframework.http.HttpStatus.CREATED;
-import static org.springframework.http.HttpStatus.OK;
+import static org.springframework.http.HttpStatus.*;
+import static org.springframework.security.authentication.UsernamePasswordAuthenticationToken.unauthenticated;
 
 @RestController
 @RequiredArgsConstructor
@@ -49,7 +50,7 @@ public class UserController {
 
     @PostMapping("/login")
     public ResponseEntity<HttpResponse> login(@RequestBody @Valid LoginRequest loginRequest) {
-        authManager.authenticate(new UsernamePasswordAuthenticationToken(loginRequest.getEmail(), loginRequest.getPassword()));
+        authManager.authenticate(unauthenticated(loginRequest.getEmail(), loginRequest.getPassword()));
         UserDTO user = userSvc.getUserByEmail(loginRequest.getEmail());
         return user.isUsingMfa() ? sendVerificationCode(user) : sendResponse(user);
     }
@@ -71,7 +72,6 @@ public class UserController {
     @GetMapping("/profile")
     public ResponseEntity<HttpResponse> getProfile(Authentication authentication) {
         UserDTO user = userSvc.getUserByEmail(authentication.getName());
-        System.out.println(authentication.getPrincipal());
         return ResponseEntity.ok()
                 .body(HttpResponse.builder()
                         .timeStamp(now().toString())
@@ -79,6 +79,17 @@ public class UserController {
                         .message("Profile Retrieved")
                         .status(OK)
                         .statusCode(OK.value())
+                        .build());
+    }
+
+    @RequestMapping("/error")
+    public ResponseEntity<HttpResponse> handleError(HttpServletRequest request) {
+        return ResponseEntity.badRequest()
+                .body(HttpResponse.builder()
+                        .timeStamp(now().toString())
+                        .reason("Request not found.")
+                        .status(NOT_FOUND)
+                        .statusCode(NOT_FOUND.value())
                         .build());
     }
 
