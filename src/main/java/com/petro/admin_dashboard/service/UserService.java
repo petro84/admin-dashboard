@@ -1,0 +1,15 @@
+package com.petro.admin_dashboard.service;
+
+import com.petro.admin_dashboard.model.User;
+import com.petro.admin_dashboard.model.dto.UserDTO;
+
+public interface UserService {
+
+    UserDTO createUser(User user);
+
+    UserDTO getUserByEmail(String email);
+
+    void sendVerificationCode(UserDTO user);
+
+    UserDTO verifyCode(String email, String code);
+}

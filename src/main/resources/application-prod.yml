@@ -1,0 +1,22 @@
+spring:
+  application:
+    name: Dashboard
+  datasource:
+    url: jdbc:mysql://127.0.0.1:3306
+    password: Lowell12
+    username: root
+  jpa:
+    database-platform: org.hibernate.dialect.MySQL8InnoDBDialect
+    generate-ddl: true
+    show-sql: true
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        globally_quoted_indentifier: true
+        dialect: org.hibernate.dialect.MySQL8Dialect
+        format_sql: true
+  sql:
+    init:
+      mode: never
+      continue-on-error: false

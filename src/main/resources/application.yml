@@ -1,0 +1,7 @@
+spring:
+  profiles:
+    active: @spring.profiles.active@
+
+application:
+  title: Admin Dashboard
+  version: 1.0
