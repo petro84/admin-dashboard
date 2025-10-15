@@ -7,7 +7,9 @@ import com.auth0.jwt.exceptions.InvalidClaimException;
 import com.auth0.jwt.exceptions.JWTVerificationException;
 import com.auth0.jwt.exceptions.TokenExpiredException;
 import com.petro.admin_dashboard.model.UserPrincipal;
+import com.petro.admin_dashboard.service.UserService;
 import jakarta.servlet.http.HttpServletRequest;
+import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -25,6 +27,7 @@ import static java.lang.System.currentTimeMillis;
 import static java.util.Arrays.stream;
 
 @Component
+@RequiredArgsConstructor
 public class TokenProvider {
 
     private static final String ISSUER = "PETRO";
@@ -32,6 +35,8 @@ public class TokenProvider {
     private static final int ACCESS_TOKEN_EXPIRATION_TIME = 1_800_000;
     private static final String AUTHORITIES = "authorities";
     private static final long REFRESH_TOKEN_EXPIRATION_TIME = 432_000_000;
+
+    private final UserService userScv;
 
     @Value("${jwt.secret}")
     String secret;
@@ -54,7 +59,8 @@ public class TokenProvider {
     }
 
     public Authentication getAuthentication(String email, List<SimpleGrantedAuthority> authorities, HttpServletRequest request) {
-        UsernamePasswordAuthenticationToken userNamePassAuthToken = new UsernamePasswordAuthenticationToken(email, null, authorities);
+        // This line is break the profile endpoint from returning a 200
+        UsernamePasswordAuthenticationToken userNamePassAuthToken = new UsernamePasswordAuthenticationToken(userScv.getUserByEmail(email), null, authorities);
         userNamePassAuthToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
         return userNamePassAuthToken;
     }

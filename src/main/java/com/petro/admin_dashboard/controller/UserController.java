@@ -1,5 +1,6 @@
 package com.petro.admin_dashboard.controller;
 
+import com.petro.admin_dashboard.exception.ApiException;
 import com.petro.admin_dashboard.model.HttpResponse;
 import com.petro.admin_dashboard.model.LoginRequest;
 import com.petro.admin_dashboard.model.User;
@@ -9,6 +10,7 @@ import com.petro.admin_dashboard.provider.TokenProvider;
 import com.petro.admin_dashboard.service.RoleService;
 import com.petro.admin_dashboard.service.UserService;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -21,6 +23,7 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 import java.net.URI;
 
 import static com.petro.admin_dashboard.mapper.UserDTOMapper.toUser;
+import static com.petro.admin_dashboard.utils.ExceptionUtils.processError;
 import static java.time.LocalDateTime.now;
 import static java.util.Map.of;
 import static org.springframework.http.HttpStatus.*;
@@ -34,6 +37,8 @@ public class UserController {
     private final AuthenticationManager authManager;
     private final TokenProvider tokenProvider;
     private final RoleService roleSvc;
+    private final HttpServletRequest request;
+    private final HttpServletResponse response;
 
     @PostMapping("/register")
     public ResponseEntity<HttpResponse> saveUser(@RequestBody @Valid User user) {
@@ -50,8 +55,10 @@ public class UserController {
 
     @PostMapping("/login")
     public ResponseEntity<HttpResponse> login(@RequestBody @Valid LoginRequest loginRequest) {
-        authManager.authenticate(unauthenticated(loginRequest.getEmail(), loginRequest.getPassword()));
-        UserDTO user = userSvc.getUserByEmail(loginRequest.getEmail());
+        Authentication authentication = authenticate(loginRequest.getEmail(), loginRequest.getPassword());
+        UserDTO user = getAuthUser(authentication);
+        System.out.println(authentication);
+        System.out.println(((UserPrincipal) authentication.getPrincipal()).getUser());
         return user.isUsingMfa() ? sendVerificationCode(user) : sendResponse(user);
     }
 
@@ -93,6 +100,19 @@ public class UserController {
                         .build());
     }
 
+    private UserDTO getAuthUser(Authentication auth) {
+        return ((UserPrincipal) auth.getPrincipal()).getUser();
+    }
+
+    private Authentication authenticate(String email, String password) {
+        try {
+            return authManager.authenticate(unauthenticated(email, password));
+        } catch (Exception ex) {
+            processError(request, response, ex);
+            throw new ApiException(ex.getMessage());
+        }
+    }
+
     private ResponseEntity<HttpResponse> sendResponse(UserDTO user) {
         return ResponseEntity.ok()
                 .body(HttpResponse.builder()
@@ -106,7 +126,7 @@ public class UserController {
     }
 
     private UserPrincipal getUserPrincipal(UserDTO user) {
-        return new UserPrincipal(toUser(userSvc.getUserByEmail(user.getEmail())), roleSvc.getRoleByUserId(user.getId()).getPermission());
+        return new UserPrincipal(toUser(userSvc.getUserByEmail(user.getEmail())), roleSvc.getRoleByUserId(user.getId()));
     }
 
     private ResponseEntity<HttpResponse> sendVerificationCode(UserDTO user) {
