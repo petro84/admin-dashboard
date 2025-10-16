@@ -26,6 +26,7 @@ import static com.petro.admin_dashboard.mapper.UserDTOMapper.toUser;
 import static com.petro.admin_dashboard.utils.ExceptionUtils.processError;
 import static java.time.LocalDateTime.now;
 import static java.util.Map.of;
+import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.http.HttpStatus.*;
 import static org.springframework.security.authentication.UsernamePasswordAuthenticationToken.unauthenticated;
 
@@ -39,6 +40,8 @@ public class UserController {
     private final RoleService roleSvc;
     private final HttpServletRequest request;
     private final HttpServletResponse response;
+
+    private static final String TOKEN_PREFIX = "Bearer ";
 
     @PostMapping("/register")
     public ResponseEntity<HttpResponse> saveUser(@RequestBody @Valid User user) {
@@ -89,15 +92,97 @@ public class UserController {
                         .build());
     }
 
-    @RequestMapping("/error")
-    public ResponseEntity<HttpResponse> handleError(HttpServletRequest request) {
+    @GetMapping("/reset-password/{email}")
+    public ResponseEntity<HttpResponse> resetPassword(@PathVariable("email") String email) {
+        userSvc.resetPassword(email);
+        return ResponseEntity.ok()
+                .body(HttpResponse.builder()
+                        .timeStamp(now().toString())
+                        .message("Email sent. Check inbox to reset password.")
+                        .status(OK)
+                        .statusCode(OK.value())
+                        .build());
+    }
+
+    @GetMapping("/verify/password/{key}")
+    public ResponseEntity<HttpResponse> verifyPasswordUrl(@PathVariable("key") String key) {
+        UserDTO user = userSvc.verifyPasswordKey(key);
+        return ResponseEntity.ok()
+                .body(HttpResponse.builder()
+                        .timeStamp(now().toString())
+                        .data(of("user", user))
+                        .message("Please enter a new password")
+                        .status(OK)
+                        .statusCode(OK.value())
+                        .build());
+    }
+
+    @PostMapping("/reset-password/{key}/{password}/{confirmPassword}")
+    public ResponseEntity<HttpResponse> resetPassword(@PathVariable("key") String key,
+                                                      @PathVariable("password") String password,
+                                                      @PathVariable("confirmPassword") String confirmPassword) {
+        userSvc.renewPassword(key, password, confirmPassword);
+        return ResponseEntity.ok()
+                .body(HttpResponse.builder()
+                        .timeStamp(now().toString())
+                        .message("Password has been reset.")
+                        .status(OK)
+                        .statusCode(OK.value())
+                        .build());
+    }
+
+    @GetMapping("/verify/account/{key}")
+    public ResponseEntity<HttpResponse> verifyAccount(@PathVariable("key") String key) {
+        return ResponseEntity.ok()
+                .body(HttpResponse.builder()
+                        .timeStamp(now().toString())
+                        .message(userSvc.verifyAccount(key).isEnabled() ? "Account already verified" : "Account verified")
+                        .status(OK)
+                        .statusCode(OK.value())
+                        .build());
+    }
+
+    @GetMapping("/refresh/token")
+    public ResponseEntity<HttpResponse> refreshToken(HttpServletRequest request) {
+        if (isHeaderAndTokenValid(request)) {
+            String token = request.getHeader(AUTHORIZATION).substring(TOKEN_PREFIX.length());
+            UserDTO user = userSvc.getUserByEmail(tokenProvider.getSubject(token, request));
+            return ResponseEntity.ok()
+                    .body(HttpResponse.builder()
+                            .timeStamp(now().toString())
+                            .data(of("user", user, "access_token", tokenProvider.createAccessToken(getUserPrincipal(user)),
+                                    "refresh_token", token))
+                            .message("Token Refresh")
+                            .status(OK)
+                            .statusCode(OK.value())
+                            .build());
+        }
+
         return ResponseEntity.badRequest()
                 .body(HttpResponse.builder()
                         .timeStamp(now().toString())
-                        .reason("Request not found.")
-                        .status(NOT_FOUND)
-                        .statusCode(NOT_FOUND.value())
+                        .reason("Refresh token missing or invalid.")
+                        .developerMessage("Refresh token missing or invalid.")
+                        .status(BAD_REQUEST)
+                        .statusCode(BAD_REQUEST.value())
                         .build());
+    }
+
+    private boolean isHeaderAndTokenValid(HttpServletRequest request) {
+        return request.getHeader(AUTHORIZATION) != null &&
+                request.getHeader(AUTHORIZATION).startsWith(TOKEN_PREFIX) &&
+                tokenProvider.isTokenValid(tokenProvider.getSubject(request.getHeader(AUTHORIZATION).substring(TOKEN_PREFIX.length()), request),
+                        request.getHeader(AUTHORIZATION).substring(TOKEN_PREFIX.length()));
+    }
+
+    @RequestMapping("/error")
+    public ResponseEntity<HttpResponse> handleError(HttpServletRequest request) {
+        return new ResponseEntity<>(HttpResponse.builder()
+                .timeStamp(now().toString())
+                .reason("There is no mapping for a " + request.getMethod() + " request path on the server.")
+                .status(NOT_FOUND)
+                .statusCode(NOT_FOUND.value())
+                .build(), NOT_FOUND);
     }
 
     private UserDTO getAuthUser(Authentication auth) {

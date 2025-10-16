@@ -60,7 +60,7 @@ public class TokenProvider {
 
     public Authentication getAuthentication(String email, List<SimpleGrantedAuthority> authorities, HttpServletRequest request) {
         // This line is break the profile endpoint from returning a 200
-        UsernamePasswordAuthenticationToken userNamePassAuthToken = new UsernamePasswordAuthenticationToken(userScv.getUserByEmail(email), null, authorities);
+        UsernamePasswordAuthenticationToken userNamePassAuthToken = new UsernamePasswordAuthenticationToken(userScv.getUserByEmail(email).getEmail(), null, authorities);
         userNamePassAuthToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
         return userNamePassAuthToken;
     }
