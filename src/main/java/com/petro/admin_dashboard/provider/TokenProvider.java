@@ -10,7 +10,6 @@ import com.petro.admin_dashboard.model.UserPrincipal;
 import com.petro.admin_dashboard.service.UserService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
-import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -60,7 +59,6 @@ public class TokenProvider {
     }
 
     public Authentication getAuthentication(Long userId, List<SimpleGrantedAuthority> authorities, HttpServletRequest request) {
-        // This line is break the profile endpoint from returning a 200
         UsernamePasswordAuthenticationToken userNamePassAuthToken = new UsernamePasswordAuthenticationToken(userScv.getByUserId(userId), null, authorities);
         userNamePassAuthToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
         return userNamePassAuthToken;

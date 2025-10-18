@@ -177,6 +177,19 @@ public class UserController {
                         .build());
     }
 
+    @PatchMapping("/update/password")
+    public ResponseEntity<HttpResponse> updatePassword(Authentication authentication, @RequestBody @Valid UpdatePasswordRequest request) {
+        UserDTO user = getAuthenticatedUser(authentication);
+        userSvc.updatePassword(user.getId(), request.getCurrentPassword(), request.getNewPassword(), request.getConfirmNewPassword());
+        return ResponseEntity.ok()
+                .body(HttpResponse.builder()
+                        .timeStamp(now().toString())
+                        .message("Password updated successfully")
+                        .status(OK)
+                        .statusCode(OK.value())
+                        .build());
+    }
+
     private boolean isHeaderAndTokenValid(HttpServletRequest request) {
         return request.getHeader(AUTHORIZATION) != null &&
                 request.getHeader(AUTHORIZATION).startsWith(TOKEN_PREFIX) &&

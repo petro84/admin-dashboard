@@ -122,7 +122,7 @@ public class UserRepositoryImpl implements UserRepository<User>, UserDetailsServ
         try {
             return jdbc.queryForObject(SELECT_USER_BY_EMAIL_QUERY, of("email", email), new UserRowMapper());
         } catch (EmptyResultDataAccessException ex) {
-          throw new ApiException("No user found by email: " + email);
+            throw new ApiException("No user found by email: " + email);
         } catch (Exception ex) {
             log.error(ex.getMessage());
             throw new ApiException("An error occured, please try again.");
@@ -191,7 +191,8 @@ public class UserRepositoryImpl implements UserRepository<User>, UserDetailsServ
 
     @Override
     public User verifyPasswordKey(String key) {
-        if (isLinkExpired(key, PASSWORD)) throw new ApiException("This link has expired. Please reset your password again.");
+        if (isLinkExpired(key, PASSWORD))
+            throw new ApiException("This link has expired. Please reset your password again.");
         try {
             User user = jdbc.queryForObject(SELECT_USER_BY_PASSWORD_URL_QUERY, of("url", getVerificationUrl(key, PASSWORD.getType())), new UserRowMapper());
             jdbc.update(DELETE_PASSWORD_VERIFICATION_BY_USER_ID_QUERY, of("userId", user.getId()));
@@ -205,7 +206,8 @@ public class UserRepositoryImpl implements UserRepository<User>, UserDetailsServ
 
     @Override
     public void renewPassword(String key, String password, String confirmPassword) {
-        if (!password.equals(confirmPassword)) throw new ApiException("Passwords do not match. Please reset your password again.");
+        if (!password.equals(confirmPassword))
+            throw new ApiException("Passwords do not match. Please reset your password again.");
         try {
             jdbc.update(UPDATE_USER_PASSWORD_BY_URL_QUERY, of("password", encoder.encode(password), "url", getVerificationUrl(key, PASSWORD.getType())));
             jdbc.update(DELETE_VERIFICATION_BY_URL_QUERY, of("url", getVerificationUrl(key, PASSWORD.getType())));
@@ -240,6 +242,23 @@ public class UserRepositoryImpl implements UserRepository<User>, UserDetailsServ
         }
     }
 
+    @Override
+    public void updatePassword(Long id, String currentPassword, String newPassword, String confirmNewPassword) {
+        if (!newPassword.equals(confirmNewPassword))
+            throw new ApiException("Passwords do not match. Please try again.");
+        User user = get(id);
+
+        if (encoder.matches(currentPassword, user.getPassword())) {
+            try {
+                jdbc.update(UPDATE_USER_PASSWORD_BY_ID_QUERY, of("password", encoder.encode(newPassword),  "userId", user.getId()));
+            } catch (Exception ex) {
+                throw new ApiException("An error occurred, please try again.");
+            }
+        } else {
+            throw new ApiException("Current password is incorrect. Please try again.");
+        }
+    }
+
     private Boolean isLinkExpired(String key, VerificationType password) {
         try {
             return jdbc.queryForObject(SELECT_EXPIRATION_BY_URL, of("url", getVerificationUrl(key, password.getType())), Boolean.class);
@@ -252,7 +271,7 @@ public class UserRepositoryImpl implements UserRepository<User>, UserDetailsServ
 
     private Boolean isVerificationCodeExpired(String code) {
         try {
-          return jdbc.queryForObject(SELECT_CODE_EXPIRATION_QUERY, of("code", code), Boolean.class);
+            return jdbc.queryForObject(SELECT_CODE_EXPIRATION_QUERY, of("code", code), Boolean.class);
         } catch (EmptyResultDataAccessException ex) {
             throw new ApiException("This code is no longer valid. Please login again.");
         } catch (Exception ex) {
@@ -278,7 +297,7 @@ public class UserRepositoryImpl implements UserRepository<User>, UserDetailsServ
                 .addValue("firstName", user.getFirstName())
                 .addValue("lastName", user.getLastName())
                 .addValue("email", user.getEmail())
-                .addValue( "phone", user.getPhone())
+                .addValue("phone", user.getPhone())
                 .addValue("address", user.getAddress())
                 .addValue("title", user.getTitle())
                 .addValue("bio", user.getBio());

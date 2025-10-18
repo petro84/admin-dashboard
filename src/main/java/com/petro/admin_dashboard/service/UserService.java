@@ -26,4 +26,6 @@ public interface UserService {
     UserDTO updateUserDetails(@Valid UpdateRequest user);
 
     UserDTO getByUserId(Long userId);
+
+    void updatePassword(Long id, String currentPassword, String newPassword, String confirmNewPassword);
 }
