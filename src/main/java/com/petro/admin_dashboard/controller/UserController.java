@@ -1,10 +1,7 @@
 package com.petro.admin_dashboard.controller;
 
 import com.petro.admin_dashboard.exception.ApiException;
-import com.petro.admin_dashboard.model.HttpResponse;
-import com.petro.admin_dashboard.model.LoginRequest;
-import com.petro.admin_dashboard.model.User;
-import com.petro.admin_dashboard.model.UserPrincipal;
+import com.petro.admin_dashboard.model.*;
 import com.petro.admin_dashboard.model.dto.UserDTO;
 import com.petro.admin_dashboard.provider.TokenProvider;
 import com.petro.admin_dashboard.service.RoleService;
@@ -15,15 +12,15 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import java.net.URI;
+import java.util.concurrent.TimeUnit;
 
 import static com.petro.admin_dashboard.mapper.UserDTOMapper.toUser;
-import static com.petro.admin_dashboard.utils.ExceptionUtils.processError;
+import static com.petro.admin_dashboard.utils.UserUtils.*;
 import static java.time.LocalDateTime.now;
 import static java.util.Map.of;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
@@ -59,9 +56,7 @@ public class UserController {
     @PostMapping("/login")
     public ResponseEntity<HttpResponse> login(@RequestBody @Valid LoginRequest loginRequest) {
         Authentication authentication = authenticate(loginRequest.getEmail(), loginRequest.getPassword());
-        UserDTO user = getAuthUser(authentication);
-        System.out.println(authentication);
-        System.out.println(((UserPrincipal) authentication.getPrincipal()).getUser());
+        UserDTO user = getLoggedInUser(authentication);
         return user.isUsingMfa() ? sendVerificationCode(user) : sendResponse(user);
     }
 
@@ -81,7 +76,7 @@ public class UserController {
 
     @GetMapping("/profile")
     public ResponseEntity<HttpResponse> getProfile(Authentication authentication) {
-        UserDTO user = userSvc.getUserByEmail(authentication.getName());
+        UserDTO user = userSvc.getUserByEmail(getAuthenticatedUser(authentication).getEmail());
         return ResponseEntity.ok()
                 .body(HttpResponse.builder()
                         .timeStamp(now().toString())
@@ -146,7 +141,7 @@ public class UserController {
     public ResponseEntity<HttpResponse> refreshToken(HttpServletRequest request) {
         if (isHeaderAndTokenValid(request)) {
             String token = request.getHeader(AUTHORIZATION).substring(TOKEN_PREFIX.length());
-            UserDTO user = userSvc.getUserByEmail(tokenProvider.getSubject(token, request));
+            UserDTO user = userSvc.getByUserId(tokenProvider.getSubject(token, request));
             return ResponseEntity.ok()
                     .body(HttpResponse.builder()
                             .timeStamp(now().toString())
@@ -168,6 +163,20 @@ public class UserController {
                         .build());
     }
 
+    @PatchMapping("/update")
+    public ResponseEntity<HttpResponse> updateUser(@RequestBody @Valid UpdateRequest user) throws InterruptedException {
+        TimeUnit.SECONDS.sleep(3);
+        UserDTO updatedUser = userSvc.updateUserDetails(user);
+        return ResponseEntity.ok()
+                .body(HttpResponse.builder()
+                        .timeStamp(now().toString())
+                        .data(of("user", updatedUser))
+                        .message("Profile updated")
+                        .status(OK)
+                        .statusCode(OK.value())
+                        .build());
+    }
+
     private boolean isHeaderAndTokenValid(HttpServletRequest request) {
         return request.getHeader(AUTHORIZATION) != null &&
                 request.getHeader(AUTHORIZATION).startsWith(TOKEN_PREFIX) &&
@@ -185,15 +194,11 @@ public class UserController {
                 .build(), NOT_FOUND);
     }
 
-    private UserDTO getAuthUser(Authentication auth) {
-        return ((UserPrincipal) auth.getPrincipal()).getUser();
-    }
 
     private Authentication authenticate(String email, String password) {
         try {
             return authManager.authenticate(unauthenticated(email, password));
         } catch (Exception ex) {
-            processError(request, response, ex);
             throw new ApiException(ex.getMessage());
         }
     }

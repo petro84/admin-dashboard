@@ -4,6 +4,7 @@ import com.petro.admin_dashboard.enumeration.VerificationType;
 import com.petro.admin_dashboard.exception.ApiException;
 import com.petro.admin_dashboard.mapper.UserRowMapper;
 import com.petro.admin_dashboard.model.Role;
+import com.petro.admin_dashboard.model.UpdateRequest;
 import com.petro.admin_dashboard.model.User;
 import com.petro.admin_dashboard.model.UserPrincipal;
 import com.petro.admin_dashboard.model.dto.UserDTO;
@@ -83,7 +84,14 @@ public class UserRepositoryImpl implements UserRepository<User>, UserDetailsServ
 
     @Override
     public User get(Long userId) {
-        return null;
+        try {
+            return jdbc.queryForObject(SELECT_USER_BY_ID, of("id", userId), new UserRowMapper());
+        } catch (EmptyResultDataAccessException ex) {
+            throw new ApiException("No user found by id: " + userId);
+        } catch (Exception ex) {
+            log.error(ex.getMessage());
+            throw new ApiException("An error occured, please try again.");
+        }
     }
 
     @Override
@@ -220,6 +228,18 @@ public class UserRepositoryImpl implements UserRepository<User>, UserDetailsServ
         }
     }
 
+    @Override
+    public User updateUserDetails(UpdateRequest user) {
+        try {
+            jdbc.update(UPDATE_USER_DETAILS_QUERY, getUserDetailsSqlParameterSource(user));
+            return get(user.getId());
+        } catch (EmptyResultDataAccessException ex) {
+            throw new ApiException("No user found by id: " + user.getId());
+        } catch (Exception ex) {
+            throw new ApiException("An error occurred, please try again.");
+        }
+    }
+
     private Boolean isLinkExpired(String key, VerificationType password) {
         try {
             return jdbc.queryForObject(SELECT_EXPIRATION_BY_URL, of("url", getVerificationUrl(key, password.getType())), Boolean.class);
@@ -250,6 +270,18 @@ public class UserRepositoryImpl implements UserRepository<User>, UserDetailsServ
                 .addValue("lastName", user.getLastName())
                 .addValue("email", user.getEmail())
                 .addValue("password", encoder.encode(user.getPassword()));
+    }
+
+    private SqlParameterSource getUserDetailsSqlParameterSource(UpdateRequest user) {
+        return new MapSqlParameterSource()
+                .addValue("id", user.getId())
+                .addValue("firstName", user.getFirstName())
+                .addValue("lastName", user.getLastName())
+                .addValue("email", user.getEmail())
+                .addValue( "phone", user.getPhone())
+                .addValue("address", user.getAddress())
+                .addValue("title", user.getTitle())
+                .addValue("bio", user.getBio());
     }
 
     private String getVerificationUrl(String key, String type) {

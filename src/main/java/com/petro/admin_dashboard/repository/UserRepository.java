@@ -1,5 +1,6 @@
 package com.petro.admin_dashboard.repository;
 
+import com.petro.admin_dashboard.model.UpdateRequest;
 import com.petro.admin_dashboard.model.User;
 import com.petro.admin_dashboard.model.dto.UserDTO;
 
@@ -12,17 +13,19 @@ public interface UserRepository<T extends User> {
     T update(T data);
     Boolean delete(Long userId);
 
-    User getUserByEmail(String email);
+    T getUserByEmail(String email);
 
     void sendVerificationCode(UserDTO user);
 
-    User verifyCode(String email, String code);
+    T verifyCode(String email, String code);
 
     void resetPassword(String email);
 
-    User verifyPasswordKey(String key);
+    T verifyPasswordKey(String key);
 
     void renewPassword(String key, String password, String confirmPassword);
 
-    User verifyAccount(String key);
+    T verifyAccount(String key);
+
+    T updateUserDetails(UpdateRequest user);
 }

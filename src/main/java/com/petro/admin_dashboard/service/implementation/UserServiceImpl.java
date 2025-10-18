@@ -1,6 +1,7 @@
 package com.petro.admin_dashboard.service.implementation;
 
 import com.petro.admin_dashboard.model.Role;
+import com.petro.admin_dashboard.model.UpdateRequest;
 import com.petro.admin_dashboard.model.User;
 import com.petro.admin_dashboard.model.dto.UserDTO;
 import com.petro.admin_dashboard.repository.RoleRepository;
@@ -55,6 +56,16 @@ public class UserServiceImpl implements UserService {
     @Override
     public UserDTO verifyAccount(String key) {
         return mapToUserDTO(userRepo.verifyAccount(key));
+    }
+
+    @Override
+    public UserDTO updateUserDetails(UpdateRequest user) {
+        return mapToUserDTO(userRepo.updateUserDetails(user));
+    }
+
+    @Override
+    public UserDTO getByUserId(Long userId) {
+        return mapToUserDTO(userRepo.get(userId));
     }
 
     private UserDTO mapToUserDTO(User user) {
