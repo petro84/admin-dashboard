@@ -33,8 +33,6 @@ public class CustomAuthFilter extends OncePerRequestFilter {
     private static final String[] PUBLIC_ROUTES = {"/user/login", "/user/register", "/user/verify/code", "/user/refresh/token", "user/image"};
     private static final String HTTP_OPTIONS_METHOD = "OPTIONS";
     private final TokenProvider tokenProvider;
-    protected static final String TOKEN_KEY = "token";
-    protected static final String EMAIL_KEY = "email";
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) throws ServletException {

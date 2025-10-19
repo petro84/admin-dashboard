@@ -24,8 +24,12 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Repository;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Collection;
 import java.util.Date;
 import java.util.List;
@@ -35,8 +39,10 @@ import static com.petro.admin_dashboard.enumeration.RoleType.ROLE_USER;
 import static com.petro.admin_dashboard.enumeration.VerificationType.ACCOUNT;
 import static com.petro.admin_dashboard.enumeration.VerificationType.PASSWORD;
 import static com.petro.admin_dashboard.query.UserQuery.*;
+import static java.nio.file.StandardCopyOption.REPLACE_EXISTING;
 import static java.util.Map.of;
 import static java.util.Objects.requireNonNull;
+import static org.apache.commons.lang3.StringUtils.isBlank;
 import static org.apache.commons.lang3.time.DateFormatUtils.format;
 import static org.apache.commons.lang3.time.DateUtils.addDays;
 
@@ -257,6 +263,63 @@ public class UserRepositoryImpl implements UserRepository<User>, UserDetailsServ
         } else {
             throw new ApiException("Current password is incorrect. Please try again.");
         }
+    }
+
+    @Override
+    public void updateAccountSettings(Long userId, Boolean enabled, Boolean notLocked) {
+        try {
+            jdbc.update(UPDATE_USER_SETTINGS_QUERY, of("userId", userId, "enabled", enabled, "notLocked", notLocked));
+        } catch (Exception ex) {
+            throw new ApiException("An error occurred. Please try again.");
+        }
+    }
+
+    @Override
+    public User toggleMfa(String email) {
+        User user = getUserByEmail(email);
+        if (isBlank(user.getPhone())) {
+            throw new ApiException("You need a phone number to change multi-factor authentication");
+        }
+
+        user.setUsingMfa(!user.isUsingMfa());
+
+        try {
+            jdbc.update(TOGGLE_USER_MFA_QUERY, of("email", email, "isUsingMfa", user.isUsingMfa()));
+            return user;
+        } catch (Exception ex) {
+            throw new ApiException("Unable to update multi-factor authentication");
+        }
+    }
+
+    @Override
+    public void updateImage(UserDTO user, MultipartFile image) {
+        String userImageUrl = setUserImageUrl(user.getEmail());
+        user.setImageUrl(userImageUrl);
+        saveImage(user.getEmail(), image);
+        jdbc.update(UPDATE_USER_IMAGE_QUERY, of("imageUrl", userImageUrl, "userId", user.getId()));
+    }
+
+    private void saveImage(String email, MultipartFile image) {
+        Path fileStorageLocation = Paths.get(System.getProperty("user.home") + "/Downloads/image/").toAbsolutePath().normalize();
+
+        if (!Files.exists(fileStorageLocation)) {
+            try {
+                Files.createDirectories(fileStorageLocation);
+            } catch (Exception ex) {
+                throw new ApiException("Unable to create image directory");
+            }
+        }
+
+        try {
+            Files.copy(image.getInputStream(), fileStorageLocation.resolve(email + ".png"), REPLACE_EXISTING);
+        } catch (Exception ex) {
+            throw new ApiException(ex.getMessage());
+        }
+    }
+
+    private String setUserImageUrl(String email) {
+        return ServletUriComponentsBuilder.fromCurrentContextPath()
+                .path("/user/image/" + email + ".png").toUriString();
     }
 
     private Boolean isLinkExpired(String key, VerificationType password) {

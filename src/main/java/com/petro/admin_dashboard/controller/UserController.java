@@ -14,9 +14,13 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
+import java.io.IOException;
 import java.net.URI;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.concurrent.TimeUnit;
 
 import static com.petro.admin_dashboard.mapper.UserDTOMapper.toUser;
@@ -25,6 +29,7 @@ import static java.time.LocalDateTime.now;
 import static java.util.Map.of;
 import static org.springframework.http.HttpHeaders.AUTHORIZATION;
 import static org.springframework.http.HttpStatus.*;
+import static org.springframework.http.MediaType.IMAGE_PNG_VALUE;
 import static org.springframework.security.authentication.UsernamePasswordAuthenticationToken.unauthenticated;
 
 @RestController
@@ -80,7 +85,7 @@ public class UserController {
         return ResponseEntity.ok()
                 .body(HttpResponse.builder()
                         .timeStamp(now().toString())
-                        .data(of("user", user))
+                        .data(of("user", user, "roles", roleSvc.getRoles()))
                         .message("Profile Retrieved")
                         .status(OK)
                         .statusCode(OK.value())
@@ -190,11 +195,65 @@ public class UserController {
                         .build());
     }
 
-    private boolean isHeaderAndTokenValid(HttpServletRequest request) {
-        return request.getHeader(AUTHORIZATION) != null &&
-                request.getHeader(AUTHORIZATION).startsWith(TOKEN_PREFIX) &&
-                tokenProvider.isTokenValid(tokenProvider.getSubject(request.getHeader(AUTHORIZATION).substring(TOKEN_PREFIX.length()), request),
-                        request.getHeader(AUTHORIZATION).substring(TOKEN_PREFIX.length()));
+    @PatchMapping("/update/role/{roleName}")
+    public ResponseEntity<HttpResponse> updateRole(Authentication authentication, @PathVariable("roleName") String roleName) {
+        UserDTO user = getAuthenticatedUser(authentication);
+        userSvc.updateUserRole(user.getId(), roleName);
+        return ResponseEntity.ok()
+                .body(HttpResponse.builder()
+                        .timeStamp(now().toString())
+                        .data(of("user", userSvc.getByUserId(user.getId()), "roles", roleSvc.getRoles()))
+                        .message("Role updated successfully")
+                        .status(OK)
+                        .statusCode(OK.value())
+                        .build());
+    }
+
+    @PatchMapping("/update/settings")
+    public ResponseEntity<HttpResponse> updateAccountSettings(Authentication authentication, @RequestBody @Valid SettingsRequest request) {
+        UserDTO user = getAuthenticatedUser(authentication);
+        userSvc.updateAccountSettings(user.getId(), request.getEnabled(), request.getNotLocked());
+        return ResponseEntity.ok()
+                .body(HttpResponse.builder()
+                        .timeStamp(now().toString())
+                        .data(of("user", userSvc.getByUserId(user.getId()), "roles", roleSvc.getRoles()))
+                        .message("Account settings updated successfully")
+                        .status(OK)
+                        .statusCode(OK.value())
+                        .build());
+    }
+
+    @PatchMapping("/togglemfa")
+    public ResponseEntity<HttpResponse> toggleMfa(Authentication authentication) throws InterruptedException {
+        TimeUnit.SECONDS.sleep(3);
+        UserDTO user = userSvc.toggleMfa(getAuthenticatedUser(authentication).getEmail());
+        return ResponseEntity.ok()
+                .body(HttpResponse.builder()
+                        .timeStamp(now().toString())
+                        .data(of("user", userSvc.getByUserId(user.getId()), "roles", roleSvc.getRoles()))
+                        .message("Multi-Factor authentication updated")
+                        .status(OK)
+                        .statusCode(OK.value())
+                        .build());
+    }
+
+    @PatchMapping("/update/image")
+    public ResponseEntity<HttpResponse> updateProfileImage(Authentication authentication, @RequestParam("image") MultipartFile image) {
+        UserDTO user = getAuthenticatedUser(authentication);
+        userSvc.updateImage(user, image);
+        return ResponseEntity.ok()
+                .body(HttpResponse.builder()
+                        .timeStamp(now().toString())
+                        .data(of("user", userSvc.getByUserId(user.getId()), "roles", roleSvc.getRoles()))
+                        .message("Profile image updated")
+                        .status(OK)
+                        .statusCode(OK.value())
+                        .build());
+    }
+
+    @GetMapping(value = "/image/{fileName}", produces = IMAGE_PNG_VALUE)
+    public byte[] getProfileImage(@PathVariable("fileName") String fileName) throws Exception {
+        return Files.readAllBytes(Paths.get(System.getProperty("user.home") + "/Downloads/image/" + fileName));
     }
 
     @RequestMapping("/error")
@@ -207,6 +266,12 @@ public class UserController {
                 .build(), NOT_FOUND);
     }
 
+    private boolean isHeaderAndTokenValid(HttpServletRequest request) {
+        return request.getHeader(AUTHORIZATION) != null &&
+                request.getHeader(AUTHORIZATION).startsWith(TOKEN_PREFIX) &&
+                tokenProvider.isTokenValid(tokenProvider.getSubject(request.getHeader(AUTHORIZATION).substring(TOKEN_PREFIX.length()), request),
+                        request.getHeader(AUTHORIZATION).substring(TOKEN_PREFIX.length()));
+    }
 
     private Authentication authenticate(String email, String password) {
         try {

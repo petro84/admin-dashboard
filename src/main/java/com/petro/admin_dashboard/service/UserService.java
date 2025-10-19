@@ -4,6 +4,8 @@ import com.petro.admin_dashboard.model.UpdateRequest;
 import com.petro.admin_dashboard.model.User;
 import com.petro.admin_dashboard.model.dto.UserDTO;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
+import org.springframework.web.multipart.MultipartFile;
 
 public interface UserService {
 
@@ -28,4 +30,12 @@ public interface UserService {
     UserDTO getByUserId(Long userId);
 
     void updatePassword(Long id, String currentPassword, String newPassword, String confirmNewPassword);
+
+    void updateUserRole(Long id, String roleName);
+
+    void updateAccountSettings(Long id, Boolean enabled, Boolean notLocked);
+
+    UserDTO toggleMfa(String email);
+
+    void updateImage(UserDTO user, MultipartFile image);
 }

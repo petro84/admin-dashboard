@@ -9,6 +9,7 @@ import com.petro.admin_dashboard.repository.UserRepository;
 import com.petro.admin_dashboard.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
 import static com.petro.admin_dashboard.mapper.UserDTOMapper.fromUser;
 
@@ -71,6 +72,26 @@ public class UserServiceImpl implements UserService {
     @Override
     public void updatePassword(Long id, String currentPassword, String newPassword, String confirmNewPassword) {
         userRepo.updatePassword(id, currentPassword, newPassword, confirmNewPassword);
+    }
+
+    @Override
+    public void updateUserRole(Long id, String roleName) {
+        roleRepo.updateUserRole(id, roleName);
+    }
+
+    @Override
+    public void updateAccountSettings(Long id, Boolean enabled, Boolean notLocked) {
+        userRepo.updateAccountSettings(id, enabled, notLocked);
+    }
+
+    @Override
+    public UserDTO toggleMfa(String email) {
+        return mapToUserDTO(userRepo.toggleMfa(email));
+    }
+
+    @Override
+    public void updateImage(UserDTO user, MultipartFile image) {
+        userRepo.updateImage(user, image);
     }
 
     private UserDTO mapToUserDTO(User user) {

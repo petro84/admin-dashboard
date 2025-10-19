@@ -6,6 +6,9 @@ import com.petro.admin_dashboard.service.RoleService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
+import java.util.Collection;
+import java.util.List;
+
 @Service
 @RequiredArgsConstructor
 public class RoleServiceImpl implements RoleService {
@@ -14,5 +17,10 @@ public class RoleServiceImpl implements RoleService {
     @Override
     public Role getRoleByUserId(Long id) {
         return roleRepo.getRoleByUserId(id);
+    }
+
+    @Override
+    public Collection<Role> getRoles() {
+        return roleRepo.list();
     }
 }

@@ -3,6 +3,7 @@ package com.petro.admin_dashboard.repository;
 import com.petro.admin_dashboard.model.UpdateRequest;
 import com.petro.admin_dashboard.model.User;
 import com.petro.admin_dashboard.model.dto.UserDTO;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.Collection;
 
@@ -30,4 +31,10 @@ public interface UserRepository<T extends User> {
     T updateUserDetails(UpdateRequest user);
 
     void updatePassword(Long id, String currentPassword, String newPassword, String confirmNewPassword);
+
+    void updateAccountSettings(Long userId, Boolean enabled, Boolean notLocked);
+
+    T toggleMfa(String email);
+
+    void updateImage(UserDTO user, MultipartFile image);
 }
