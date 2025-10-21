@@ -1,15 +1,19 @@
 package com.petro.admin_dashboard.controller;
 
+import com.petro.admin_dashboard.enumeration.EventType;
+import com.petro.admin_dashboard.event.NewUserEvent;
 import com.petro.admin_dashboard.exception.ApiException;
 import com.petro.admin_dashboard.model.*;
 import com.petro.admin_dashboard.model.dto.UserDTO;
 import com.petro.admin_dashboard.provider.TokenProvider;
+import com.petro.admin_dashboard.service.EventService;
 import com.petro.admin_dashboard.service.RoleService;
 import com.petro.admin_dashboard.service.UserService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.core.Authentication;
@@ -17,13 +21,13 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
-import java.io.IOException;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.concurrent.TimeUnit;
 
+import static com.petro.admin_dashboard.enumeration.EventType.*;
 import static com.petro.admin_dashboard.mapper.UserDTOMapper.toUser;
+import static com.petro.admin_dashboard.utils.ExceptionUtils.processError;
 import static com.petro.admin_dashboard.utils.UserUtils.*;
 import static java.time.LocalDateTime.now;
 import static java.util.Map.of;
@@ -42,32 +46,34 @@ public class UserController {
     private final RoleService roleSvc;
     private final HttpServletRequest request;
     private final HttpServletResponse response;
+    private final ApplicationEventPublisher publisher;
+    private final EventService eventSvc;
 
     private static final String TOKEN_PREFIX = "Bearer ";
 
     @PostMapping("/register")
     public ResponseEntity<HttpResponse> saveUser(@RequestBody @Valid User user) {
-         UserDTO userDTO = userSvc.createUser(user);
-         return ResponseEntity.created(getURI())
-                 .body(HttpResponse.builder()
-                         .timeStamp(now().toString())
-                         .data(of("user", userDTO))
-                         .message("User Created")
-                         .status(CREATED)
-                         .statusCode(CREATED.value())
-                         .build());
+        UserDTO userDTO = userSvc.createUser(user);
+        return ResponseEntity.created(getURI())
+                .body(HttpResponse.builder()
+                        .timeStamp(now().toString())
+                        .data(of("user", userDTO))
+                        .message("User Created")
+                        .status(CREATED)
+                        .statusCode(CREATED.value())
+                        .build());
     }
 
     @PostMapping("/login")
     public ResponseEntity<HttpResponse> login(@RequestBody @Valid LoginRequest loginRequest) {
-        Authentication authentication = authenticate(loginRequest.getEmail(), loginRequest.getPassword());
-        UserDTO user = getLoggedInUser(authentication);
+        UserDTO user = authenticate(loginRequest.getEmail(), loginRequest.getPassword());
         return user.isUsingMfa() ? sendVerificationCode(user) : sendResponse(user);
     }
 
     @GetMapping("/verify/code/{email}/{code}")
     public ResponseEntity<HttpResponse> verifyCode(@PathVariable("email") String email, @PathVariable("code") String code) {
-       UserDTO user = userSvc.verifyCode(email, code);
+        UserDTO user = userSvc.verifyCode(email, code);
+        publisher.publishEvent(new NewUserEvent(user.getEmail(), LOGIN_ATTEMPT_SUCCESS));
         return ResponseEntity.ok()
                 .body(HttpResponse.builder()
                         .timeStamp(now().toString())
@@ -85,7 +91,7 @@ public class UserController {
         return ResponseEntity.ok()
                 .body(HttpResponse.builder()
                         .timeStamp(now().toString())
-                        .data(of("user", user, "roles", roleSvc.getRoles()))
+                        .data(of("user", user, "roles", roleSvc.getRoles(), "events", eventSvc.getEventsByUserId(user.getId())))
                         .message("Profile Retrieved")
                         .status(OK)
                         .statusCode(OK.value())
@@ -170,12 +176,12 @@ public class UserController {
 
     @PatchMapping("/update")
     public ResponseEntity<HttpResponse> updateUser(@RequestBody @Valid UpdateRequest user) throws InterruptedException {
-        TimeUnit.SECONDS.sleep(3);
         UserDTO updatedUser = userSvc.updateUserDetails(user);
+        publisher.publishEvent(new NewUserEvent(updatedUser.getEmail(), PROFILE_UPDATE));
         return ResponseEntity.ok()
                 .body(HttpResponse.builder()
                         .timeStamp(now().toString())
-                        .data(of("user", updatedUser))
+                        .data(of("user", user, "roles", roleSvc.getRoles(), "events", eventSvc.getEventsByUserId(user.getId())))
                         .message("Profile updated")
                         .status(OK)
                         .statusCode(OK.value())
@@ -186,9 +192,11 @@ public class UserController {
     public ResponseEntity<HttpResponse> updatePassword(Authentication authentication, @RequestBody @Valid UpdatePasswordRequest request) {
         UserDTO user = getAuthenticatedUser(authentication);
         userSvc.updatePassword(user.getId(), request.getCurrentPassword(), request.getNewPassword(), request.getConfirmNewPassword());
+        publisher.publishEvent(new NewUserEvent(user.getEmail(), PASSWORD_UPDATE));
         return ResponseEntity.ok()
                 .body(HttpResponse.builder()
                         .timeStamp(now().toString())
+                        .data(of("user", userSvc.getByUserId(user.getId()), "roles", roleSvc.getRoles(), "events", eventSvc.getEventsByUserId(user.getId())))
                         .message("Password updated successfully")
                         .status(OK)
                         .statusCode(OK.value())
@@ -199,10 +207,11 @@ public class UserController {
     public ResponseEntity<HttpResponse> updateRole(Authentication authentication, @PathVariable("roleName") String roleName) {
         UserDTO user = getAuthenticatedUser(authentication);
         userSvc.updateUserRole(user.getId(), roleName);
+        publisher.publishEvent(new NewUserEvent(user.getEmail(), ROLE_UPDATE));
         return ResponseEntity.ok()
                 .body(HttpResponse.builder()
                         .timeStamp(now().toString())
-                        .data(of("user", userSvc.getByUserId(user.getId()), "roles", roleSvc.getRoles()))
+                        .data(of("user", userSvc.getByUserId(user.getId()), "roles", roleSvc.getRoles(), "events", eventSvc.getEventsByUserId(user.getId())))
                         .message("Role updated successfully")
                         .status(OK)
                         .statusCode(OK.value())
@@ -213,10 +222,11 @@ public class UserController {
     public ResponseEntity<HttpResponse> updateAccountSettings(Authentication authentication, @RequestBody @Valid SettingsRequest request) {
         UserDTO user = getAuthenticatedUser(authentication);
         userSvc.updateAccountSettings(user.getId(), request.getEnabled(), request.getNotLocked());
+        publisher.publishEvent(new NewUserEvent(user.getEmail(), ACCOUNT_SETTINGS_UPDATE));
         return ResponseEntity.ok()
                 .body(HttpResponse.builder()
                         .timeStamp(now().toString())
-                        .data(of("user", userSvc.getByUserId(user.getId()), "roles", roleSvc.getRoles()))
+                        .data(of("user", userSvc.getByUserId(user.getId()), "roles", roleSvc.getRoles(), "events", eventSvc.getEventsByUserId(user.getId())))
                         .message("Account settings updated successfully")
                         .status(OK)
                         .statusCode(OK.value())
@@ -225,12 +235,12 @@ public class UserController {
 
     @PatchMapping("/togglemfa")
     public ResponseEntity<HttpResponse> toggleMfa(Authentication authentication) throws InterruptedException {
-        TimeUnit.SECONDS.sleep(3);
         UserDTO user = userSvc.toggleMfa(getAuthenticatedUser(authentication).getEmail());
+        publisher.publishEvent(new NewUserEvent(user.getEmail(), MFA_UPDATE));
         return ResponseEntity.ok()
                 .body(HttpResponse.builder()
                         .timeStamp(now().toString())
-                        .data(of("user", userSvc.getByUserId(user.getId()), "roles", roleSvc.getRoles()))
+                        .data(of("user", userSvc.getByUserId(user.getId()), "roles", roleSvc.getRoles(), "events", eventSvc.getEventsByUserId(user.getId())))
                         .message("Multi-Factor authentication updated")
                         .status(OK)
                         .statusCode(OK.value())
@@ -241,10 +251,11 @@ public class UserController {
     public ResponseEntity<HttpResponse> updateProfileImage(Authentication authentication, @RequestParam("image") MultipartFile image) {
         UserDTO user = getAuthenticatedUser(authentication);
         userSvc.updateImage(user, image);
+        publisher.publishEvent(new NewUserEvent(user.getEmail(), PROFILE_PICTURE_UPDATE));
         return ResponseEntity.ok()
                 .body(HttpResponse.builder()
                         .timeStamp(now().toString())
-                        .data(of("user", userSvc.getByUserId(user.getId()), "roles", roleSvc.getRoles()))
+                        .data(of("user", userSvc.getByUserId(user.getId()), "roles", roleSvc.getRoles(), "events", eventSvc.getEventsByUserId(user.getId())))
                         .message("Profile image updated")
                         .status(OK)
                         .statusCode(OK.value())
@@ -273,10 +284,21 @@ public class UserController {
                         request.getHeader(AUTHORIZATION).substring(TOKEN_PREFIX.length()));
     }
 
-    private Authentication authenticate(String email, String password) {
+    private UserDTO authenticate(String email, String password) {
         try {
-            return authManager.authenticate(unauthenticated(email, password));
+            if (userSvc.getUserByEmail(email) != null) {
+                publisher.publishEvent(new NewUserEvent(email, LOGIN_ATTEMPT));
+            }
+            Authentication auth = authManager.authenticate(unauthenticated(email, password));
+            UserDTO loggedInUser = getLoggedInUser(auth);
+
+            if (!loggedInUser.isUsingMfa()) {
+                publisher.publishEvent(new NewUserEvent(email, LOGIN_ATTEMPT_SUCCESS));
+            }
+            return loggedInUser;
         } catch (Exception ex) {
+            publisher.publishEvent(new NewUserEvent(email, LOGIN_ATTEMPT_FAILURE));
+            processError(request, response, ex);
             throw new ApiException(ex.getMessage());
         }
     }
@@ -311,7 +333,7 @@ public class UserController {
     }
 
     private URI getURI() {
-         return URI.create(ServletUriComponentsBuilder.fromCurrentContextPath()
-                 .path("/user/get/<userId>").toUriString());
+        return URI.create(ServletUriComponentsBuilder.fromCurrentContextPath()
+                .path("/user/get/<userId>").toUriString());
     }
 }
