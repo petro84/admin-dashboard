@@ -1,6 +1,5 @@
 package com.petro.admin_dashboard.controller;
 
-import com.petro.admin_dashboard.enumeration.EventType;
 import com.petro.admin_dashboard.event.NewUserEvent;
 import com.petro.admin_dashboard.exception.ApiException;
 import com.petro.admin_dashboard.model.*;
