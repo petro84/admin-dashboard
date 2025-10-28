@@ -10,7 +10,6 @@ import com.petro.admin_dashboard.model.UserPrincipal;
 import com.petro.admin_dashboard.service.UserService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
-import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -21,6 +20,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.Date;
 import java.util.List;
+import java.util.Objects;
 
 import static com.auth0.jwt.algorithms.Algorithm.HMAC512;
 import static java.lang.System.currentTimeMillis;
@@ -32,9 +32,9 @@ public class TokenProvider {
 
     private static final String ISSUER = "PETRO";
     private static final String CUSTOMER_MANAGEMENT_SERVICE = "CUSTOMER_MANAGEMENT_SERVICE";
-    private static final int ACCESS_TOKEN_EXPIRATION_TIME = 1_800_000;
+    private static final int ACCESS_TOKEN_EXPIRATION_TIME = 1_800_000; // 30 minutes
     private static final String AUTHORITIES = "authorities";
-    private static final long REFRESH_TOKEN_EXPIRATION_TIME = 432_000_000;
+    private static final long REFRESH_TOKEN_EXPIRATION_TIME = 86_400_000; //1 day
 
     private final UserService userScv;
 
@@ -43,13 +43,13 @@ public class TokenProvider {
 
     public String createAccessToken(UserPrincipal userPrincipal) {
         return JWT.create().withIssuer(ISSUER).withAudience(CUSTOMER_MANAGEMENT_SERVICE)
-                .withIssuedAt(new Date()).withSubject(userPrincipal.getUsername()).withArrayClaim(AUTHORITIES, getClaimsFromUser(userPrincipal))
+                .withIssuedAt(new Date()).withSubject(String.valueOf(userPrincipal.getUser().getId())).withArrayClaim(AUTHORITIES, getClaimsFromUser(userPrincipal))
                 .withExpiresAt(new Date(currentTimeMillis() + ACCESS_TOKEN_EXPIRATION_TIME)).sign(HMAC512(secret.getBytes()));
     }
 
     public String createRefreshToken(UserPrincipal userPrincipal) {
         return JWT.create().withIssuer(ISSUER).withAudience(CUSTOMER_MANAGEMENT_SERVICE)
-                .withIssuedAt(new Date()).withSubject(userPrincipal.getUsername())
+                .withIssuedAt(new Date()).withSubject(String.valueOf(userPrincipal.getUser().getId()))
                 .withExpiresAt(new Date(currentTimeMillis() + REFRESH_TOKEN_EXPIRATION_TIME)).sign(HMAC512(secret.getBytes()));
     }
 
@@ -58,21 +58,20 @@ public class TokenProvider {
         return stream(claims).map(SimpleGrantedAuthority::new).toList();
     }
 
-    public Authentication getAuthentication(String email, List<SimpleGrantedAuthority> authorities, HttpServletRequest request) {
-        // This line is break the profile endpoint from returning a 200
-        UsernamePasswordAuthenticationToken userNamePassAuthToken = new UsernamePasswordAuthenticationToken(userScv.getUserByEmail(email), null, authorities);
+    public Authentication getAuthentication(Long userId, List<SimpleGrantedAuthority> authorities, HttpServletRequest request) {
+        UsernamePasswordAuthenticationToken userNamePassAuthToken = new UsernamePasswordAuthenticationToken(userScv.getByUserId(userId), null, authorities);
         userNamePassAuthToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
         return userNamePassAuthToken;
     }
 
-    public boolean isTokenValid(String email, String token) {
+    public boolean isTokenValid(Long userId, String token) {
         JWTVerifier verifier = getJWTVerifier();
-        return StringUtils.isNotEmpty(email) && !isTokenExpired(verifier, token);
+        return !Objects.isNull(userId) && !isTokenExpired(verifier, token);
     }
 
-    public String getSubject(String token, HttpServletRequest request) {
+    public Long getSubject(String token, HttpServletRequest request) {
         try {
-            return getJWTVerifier().verify(token).getSubject();
+            return Long.valueOf(getJWTVerifier().verify(token).getSubject());
         } catch (TokenExpiredException ex) {
             request.setAttribute("expiredMessage", ex.getMessage());
             throw ex;

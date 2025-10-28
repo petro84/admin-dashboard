@@ -6,7 +6,7 @@ import java.util.Collection;
 
 public interface RoleRepository<T extends Role> {
     T create(T data);
-    Collection<T> list(int page, int size);
+    Collection<T> list();
     T get(Long userId);
     T update(T data);
     Boolean delete(Long userId);
@@ -14,5 +14,5 @@ public interface RoleRepository<T extends Role> {
     void addRoleToUser(Long userId, String roleName);
     Role getRoleByUserId(Long userId);
     Role getRoleByUserEmail(String email);
-    void updateUserRole(Long userId, Role name);
+    void updateUserRole(Long userId, String roleName);
 }

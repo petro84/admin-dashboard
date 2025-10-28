@@ -1,6 +1,7 @@
 package com.petro.admin_dashboard.service.implementation;
 
 import com.petro.admin_dashboard.model.Role;
+import com.petro.admin_dashboard.model.UpdateRequest;
 import com.petro.admin_dashboard.model.User;
 import com.petro.admin_dashboard.model.dto.UserDTO;
 import com.petro.admin_dashboard.repository.RoleRepository;
@@ -8,6 +9,7 @@ import com.petro.admin_dashboard.repository.UserRepository;
 import com.petro.admin_dashboard.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
 import static com.petro.admin_dashboard.mapper.UserDTOMapper.fromUser;
 
@@ -35,6 +37,61 @@ public class UserServiceImpl implements UserService {
     @Override
     public UserDTO verifyCode(String email, String code) {
         return mapToUserDTO(userRepo.verifyCode(email, code));
+    }
+
+    @Override
+    public void resetPassword(String email) {
+        userRepo.resetPassword(email);
+    }
+
+    @Override
+    public UserDTO verifyPasswordKey(String key) {
+        return mapToUserDTO(userRepo.verifyPasswordKey(key));
+    }
+
+    @Override
+    public void renewPassword(String key, String password, String confirmPassword) {
+        userRepo.renewPassword(key, password, confirmPassword);
+    }
+
+    @Override
+    public UserDTO verifyAccount(String key) {
+        return mapToUserDTO(userRepo.verifyAccount(key));
+    }
+
+    @Override
+    public UserDTO updateUserDetails(UpdateRequest user) {
+        return mapToUserDTO(userRepo.updateUserDetails(user));
+    }
+
+    @Override
+    public UserDTO getByUserId(Long userId) {
+        return mapToUserDTO(userRepo.get(userId));
+    }
+
+    @Override
+    public void updatePassword(Long id, String currentPassword, String newPassword, String confirmNewPassword) {
+        userRepo.updatePassword(id, currentPassword, newPassword, confirmNewPassword);
+    }
+
+    @Override
+    public void updateUserRole(Long id, String roleName) {
+        roleRepo.updateUserRole(id, roleName);
+    }
+
+    @Override
+    public void updateAccountSettings(Long id, Boolean enabled, Boolean notLocked) {
+        userRepo.updateAccountSettings(id, enabled, notLocked);
+    }
+
+    @Override
+    public UserDTO toggleMfa(String email) {
+        return mapToUserDTO(userRepo.toggleMfa(email));
+    }
+
+    @Override
+    public void updateImage(UserDTO user, MultipartFile image) {
+        userRepo.updateImage(user, image);
     }
 
     private UserDTO mapToUserDTO(User user) {
