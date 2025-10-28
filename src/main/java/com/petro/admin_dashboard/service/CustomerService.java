@@ -16,7 +16,7 @@ public interface CustomerService {
     Invoice createInvoice(Invoice invoice);
     Page<Invoice> getInvoices(int page, int size);
     void addInvoiceToCustomer(Long id, Invoice invoice);
-
+    Iterable<Invoice> getInvoices();
     Invoice getInvoice(Long id);
 
     Stats getStats();

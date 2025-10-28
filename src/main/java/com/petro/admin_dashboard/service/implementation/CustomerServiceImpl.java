@@ -82,6 +82,11 @@ public class CustomerServiceImpl implements CustomerService {
     }
 
     @Override
+    public Iterable<Invoice> getInvoices() {
+        return invoiceRepo.findAll();
+    }
+
+    @Override
     public Stats getStats() {
         return jdbc.queryForObject(STATS_QUERY, Map.of(), new StatsRowapper());
     }
